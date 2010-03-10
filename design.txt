@@ -27,3 +27,19 @@ get mp3 link for a song
            <REF HREF="http://113.161.71.207/vnmedia/truonghero/Various_Atists/Erhu&GuzhengUltimateDialogue/01-i-believe-810651-www.woim.net.mp3" />
           </ENTRY>
         </asx>
+
+tasks
+=====
+
+  * prefix                                          ~/.woim.net/
+  * cache dir                                       ~/.woim.net/cache/
+  * dest dir                                        ~/.woim.net/mp3/<files>
+  * save album info                                 ~/.woim.net/album_id.info 
+  * save .m3u (playlist) using local files          ~/.woim.net/album_id.local.m3u
+  * save wget script                                ~/.woim.net/album_id.sh
+  * save .m3u (playlist) using url                  ~/.woim.net/album_id.remote.m3u
+  * purge cache dir
+  * download & skip cache dir
+
+end of file
+===========
