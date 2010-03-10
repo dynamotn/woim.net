@@ -1,7 +1,7 @@
 #!/usr/bin/ruby
 
-require 'rubygems'
-require 'curb'
+require 'rubygems'    # for the others
+require 'curb'        # for fetching data
 
 class Message
   def initialize(msg)
@@ -9,8 +9,33 @@ class Message
   end
 end
 
+module Cache
+  def filename(cache_id)
+    "./cache/#{cache_id}"
+  end
+
+  def write(cache_id, contents)
+    f = open(filename(cache_id), "w")
+    f.write(contents)
+    f.close
+    Message.new "cache updated: #{cache_id}"
+  end
+  
+  def read(cache_id)
+    file = filename(cache_id)
+    if File.exist?(file)
+      Message.new "cache loaded : #{cache_id}"
+      IO.readlines(file).join()
+    else
+      return nil
+    end
+  end
+end
+
+include Cache
+
 class Fetch
-  attr_reader :url
+  attr_reader :url, :cache, :cached
 
   @@agent = "Mozilla/5.0 (X11; U; Linux i686; en-US; Nautilus/1.0Final) Gecko/20020408"
   @@debug = false
@@ -32,11 +57,21 @@ class Fetch
     @@debug = value
   end
 
-  def initialize(url)
+  def initialize(url, cache = nil)
     @url = url
+    @cache = cache
+    @cached = false
   end
 
   def body
+    @cached = false
+    if @cache
+      cache = Cache::read(@cache)
+      if cache
+        @cached = true
+        return cache
+      end
+    end
     begin
       Message.new "fetching #{@url}"
       c = Curl::Easy.perform(@url) do |curl|
@@ -64,11 +99,16 @@ class Song
 
   def mp3
     link_to_mp3 = ""
-    if gs = Fetch.new(@w_url).body.match(%r|<PARAM NAME="FileName" VALUE="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
+    fetch = Fetch.new(@w_url, "song_#{@w_id}")
+    if gs = fetch.body.match(%r|<PARAM NAME="FileName" VALUE="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
-      text = Fetch.new(meta_url).body
+      text = Fetch.new(meta_url, "song_meta_#{@w_id}").body
       gs = text.match(%r|<REF HREF="(.*?)" />|i)
       link_to_mp3 = gs[1] if gs
+      unless fetch.cached
+        Cache::write("song_#{@w_id}", "<PARAM NAME=\"FileName\" VALUE=\"#{meta_url}\">")
+        Cache::write("song_meta_#{@w_id}", "<REF HREF=\"#{link_to_mp3}\" />")
+      end
     end
     return link_to_mp3
   end
@@ -86,8 +126,8 @@ class Album
   def initialize(id)
     @w_id = id.to_s
 
-    @w_text = Fetch.new("http://www.woim.net/album/#{@w_id.to_s}/index.html").body
-    # @w_text = IO.readlines("./test.data.html").join()
+    fetch = Fetch.new("http://www.woim.net/album/#{@w_id.to_s}/index.html", "album_#{@w_id}")
+    @w_text = fetch.body
 
     @w_title = nil
     @w_artist = nil
@@ -95,6 +135,7 @@ class Album
     
     get_info
     get_list
+    write_cache unless fetch.cached
   end
 
   def print
@@ -110,12 +151,23 @@ class Album
       Message.new "wget script to download mp3 file(s)"
       Message.new "-" * 46
       @w_list.each do |s|
-        puts "wget -O \"#{@w_id}_#{s[:mp3].sanitized}\" \"#{s[:mp3]}\""
+        puts "wget -O \"#{@w_title.sanitized}_#{s[:title].sanitized}.mp3\" \"#{s[:mp3]}\""
       end
     end
   end
 
 private
+
+  def write_cache
+    st = []
+    st << 'class="album_info">'
+    st << "Album: <h1>#{@w_title}</h1>"
+    st << "Artist: href=>#{@w_artist}</a>"
+    @w_list.each do |song|
+      st << "<td>0. href=\"http://www.woim.net/song/#{song[:id]}/\">#{song[:title]}</a>"
+    end
+    Cache.write("album_#{@w_id}", st.join("\n"))
+  end
 
   def get_info
     if gs = @w_text.match(%r|
@@ -149,4 +201,10 @@ Fetch.debug = false
 Fetch.proxy = {:host => "localhost",:port => 3128}
 
 Album.new(3032).print
+# http://www.woim.net/song/25629/afterlife-love.html
 
+# puts Song.new(25629).mp3
+
+# http://www.woim.net/song/33674/afterlife-love.html
+
+# puts Song.new(33674).mp3
