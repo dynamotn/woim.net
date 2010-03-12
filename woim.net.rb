@@ -22,13 +22,20 @@ module Cache
   end
   
   def read(cache_id)
-    file = filename(cache_id)
-    if File.exist?(file)
-      Message.new "cache loaded : #{cache_id}"
-      IO.readlines(file).join()
+    if cached?(cache_id)
+      begin
+        Message.new "cache loaded : #{cache_id}"
+        IO.readlines(filename(cache_id)).join()
+      rescue
+        return nil
+      end
     else
       return nil
     end
+  end
+  
+  def cached?(cache_id)
+    File.exist?(filename(cache_id))
   end
 end
 
@@ -50,7 +57,7 @@ class Fetch
   end
   
   def self.agent=(a)
-    @@agent = a
+    @@agent = a if a.is_a?(String) and !a.empty?
   end
   
   def self.debug=(value)
@@ -97,7 +104,7 @@ class Song
     @w_url = "http://www.woim.net/song/#{@w_id}/index.html"
   end
 
-  def mp3
+  def print_mp3
     link_to_mp3 = ""
     fetch = Fetch.new(@w_url, "song_#{@w_id}")
     if gs = fetch.body.match(%r|<PARAM NAME="FileName" VALUE="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
@@ -155,6 +162,19 @@ class Album
       end
     end
   end
+  
+  def print_m3u
+    unless @w_list.empty?
+      Message.new "-" * 46
+      @w_list.each do |s|
+        puts "* #{s[:title]}"
+      end
+      Message.new "-" * 46
+      Message.new "list of mp3 files"
+      Message.new "-" * 46
+      @w_list.each { |s|  puts s[:mp3] }
+    end
+  end
 
 private
 
@@ -167,6 +187,7 @@ private
       st << "<td>0. href=\"http://www.woim.net/song/#{song[:id]}/\">#{song[:title]}</a>"
     end
     Cache.write("album_#{@w_id}", st.join("\n"))
+    self
   end
 
   def get_info
@@ -178,6 +199,7 @@ private
       @w_title , @w_artist = gs[1,2]
       Message.new "album found #{@w_title} (performed by #{@w_artist})"
     end
+    self
   end
   
   def get_list
@@ -194,17 +216,19 @@ private
       song[:mp3] = Song.new(song[:id]).mp3
       @w_list << {:id => song[:id], :title => song[:title], :mp3 => song[:mp3]}
     end
+    self
   end
 end
 
 Fetch.debug = false
 Fetch.proxy = {:host => "localhost",:port => 3128}
 
-Album.new(3032).print
-# http://www.woim.net/song/25629/afterlife-love.html
-
-# puts Song.new(25629).mp3
-
-# http://www.woim.net/song/33674/afterlife-love.html
-
-# puts Song.new(33674).mp3
+ARGV.each do |url|
+  if gs = url.match(%r|/album/([0-9]+)/|) or gs = url.match(%r|^([0-9]+)$|)
+    Album.new(gs[1]).print_m3u
+  elsif gs = url.match(%r|/song/([0-9]+)/|)
+    Song.new(gs[1]).print_mp3
+  else
+    Message.new "failed to parse #{url}"
+  end
+end
