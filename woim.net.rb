@@ -104,7 +104,7 @@ class Song
     @w_url = "http://www.woim.net/song/#{@w_id}/index.html"
   end
 
-  def print_mp3
+  def mp3
     link_to_mp3 = ""
     fetch = Fetch.new(@w_url, "song_#{@w_id}")
     if gs = fetch.body.match(%r|<PARAM NAME="FileName" VALUE="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
@@ -118,6 +118,10 @@ class Song
       end
     end
     return link_to_mp3
+  end
+  
+  def print_mp3
+    puts mp3
   end
 end
 
@@ -224,9 +228,9 @@ Fetch.debug = false
 Fetch.proxy = {:host => "localhost",:port => 3128}
 
 ARGV.each do |url|
-  if gs = url.match(%r|/album/([0-9]+)/|) or gs = url.match(%r|^([0-9]+)$|)
+  if gs = url.match(%r|album/([0-9]+)|) or gs = url.match(%r|^([0-9]+)$|)
     Album.new(gs[1]).print_m3u
-  elsif gs = url.match(%r|/song/([0-9]+)/|)
+  elsif gs = url.match(%r|song/([0-9]+)|)
     Song.new(gs[1]).print_mp3
   else
     Message.new "failed to parse #{url}"
