@@ -107,7 +107,6 @@ class Song
   def mp3
     link_to_mp3 = ""
     fetch = Fetch.new(@w_url, "song_#{@w_id}")
-    # <param name="flashvars" value="autoplay=true&count=10&code=http://www.woim.net/music/2/35539/A9ZqBq/42e8a58e7efb4f71bc0377bb046dc005/f">
     if gs = fetch.body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
       text = Fetch.new(meta_url, "song_meta_#{@w_id}").body
