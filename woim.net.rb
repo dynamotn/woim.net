@@ -107,19 +107,25 @@ class Song
   def mp3
     link_to_mp3 = ""
     fetch = Fetch.new(@w_url, "song_#{@w_id}")
-    if gs = fetch.body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
+    body = fetch.body
+    if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
       text = Fetch.new(meta_url, "song_meta_#{@w_id}").body
       gs = text.match(%r|location="(.*?)">|i)
       link_to_mp3 = gs[1] if gs
-      unless fetch.cached
-        Cache::write("song_#{@w_id}", "<param name=\"flashvars\" code=#{meta_url}\">")
-        Cache::write("song_meta_#{@w_id}", "location=\"#{link_to_mp3}\">")
-      end
+    elsif gs = body.match(%r|<param name="FileName" value="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
+      meta_url = gs[1]
+      text = Fetch.new(meta_url, "song_meta_#{@w_id}").body
+      gs = text.match(%r|<ref href="(.*?)" />|i)
+      link_to_mp3 = gs[1] if gs
+    end
+    if !link_to_mp3.empty? and !fetch.cached
+      Cache::write("song_#{@w_id}", "<param name=\"flashvars\" code=#{meta_url}\">")
+      Cache::write("song_meta_#{@w_id}", "location=\"#{link_to_mp3}\">")
     end
     return link_to_mp3
   end
-  
+
   def print_mp3
     puts mp3
   end
