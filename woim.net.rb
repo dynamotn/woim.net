@@ -192,7 +192,8 @@ private
     st = []
     st << 'class="album_info">'
     st << "Album: <h1>#{@w_title}</h1>"
-    st << "Artist: href=>#{@w_artist}</a>"
+    st << "<tr></tr>"
+    st << "<tr>Artist: href=>#{@w_artist}</a></tr>"
     @w_list.each do |song|
       st << "<td>0. href=\"http://www.woim.net/song/#{song[:id]}/\">#{song[:title]}</a>"
     end
@@ -201,11 +202,12 @@ private
   end
 
   def get_info
-    if gs = @w_text.match(%r|
+    if gs = @w_text.match(%r#
                 class="album_info">.*?
                   Album:  .*? <h1>(.*?)</h1>.*?
-                  Artist: .*? href=.*?>(.*?)</a>
-                          |mx)
+                  <tr>.*?</tr>.*?
+                  <tr>.*? href=.*?>(.*?)</a>.*?</tr>
+                          #mx)
       @w_title , @w_artist = gs[1,2]
       Message.new "album found #{@w_title} (performed by #{@w_artist})"
     end
