@@ -110,12 +110,12 @@ class Song
     body = fetch.body
     if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
-      text = Fetch.new(meta_url, "song_#{@w_id}").body
+      text = fetch.cached ? body : Fetch.new(meta_url).body
       gs = text.match(%r|location="(.*?)">|i)
       link_to_mp3 = gs[1] if gs
     elsif gs = body.match(%r|<param name="FileName" value="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
-      text = Fetch.new(meta_url, "song_meta_#{@w_id}").body
+      text = fetch.cached ? body : Fetch.new(meta_url).body
       gs = text.match(%r|<ref href="(.*?)" />|i)
       link_to_mp3 = gs[1] if gs
     end
