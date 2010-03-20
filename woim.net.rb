@@ -261,4 +261,4 @@ ARGV.each do |arg|
 end
 
 albums.each {|a| Album.new(a).print_m3u }
-songs.each  {|s| Song.new(a).print_mp3  }
+songs.each  {|s| Song.new(s).print_mp3  }
