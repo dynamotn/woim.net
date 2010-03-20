@@ -1,5 +1,13 @@
 #!/usr/bin/ruby
 
+# $Id$ 
+# author   : kyanh <@viettug.org>
+# purpose  : fetch list of mp3 files from http://woim.net/
+# license  : GPL version 2
+# home page: http://viettug.org/projects/fs/wiki/woim
+# doc/usage: (described in home page)
+# policy   : http://www.woim.net/forums/viewtopic.php?t=102
+
 require 'rubygems'    # for the others
 require 'curb'        # for fetching data
 
@@ -24,7 +32,7 @@ module Cache
   def read(cache_id)
     if cached?(cache_id)
       begin
-        Message.new "cache loaded : #{cache_id}"
+        Message.new "cache loaded: #{cache_id}"
         IO.readlines(filename(cache_id)).join()
       rescue
         return nil
@@ -235,14 +243,22 @@ private
 end
 
 Fetch.debug = false
-Fetch.proxy = {:host => "localhost",:port => 3128}
+Fetch.proxy = nil # {:host => "localhost",:port => 3128}
 
-ARGV.each do |url|
-  if gs = url.match(%r|album/([0-9]+)|) or gs = url.match(%r|^([0-9]+)$|)
-    Album.new(gs[1]).print_m3u
-  elsif gs = url.match(%r|song/([0-9]+)|)
-    Song.new(gs[1]).print_mp3
+albums = []
+songs  = []
+
+ARGV.each do |arg|
+  if gs = arg.match(%r|album/([0-9]+)|) or gs = arg.match(%r|^([0-9]+)$|)
+    albums << gs[1]
+  elsif gs = arg.match(%r|song/([0-9]+)|)
+    songs << gs[1]
+  elsif gs = arg.match(%r|proxy=(.*?):([0-9]+)|)
+    Fetch.proxy = {:host => gs[1], :port => gs[2]}
   else
-    Message.new "failed to parse #{url}"
+    Message.new "failed to parse: #{url}"
   end
 end
+
+albums.each {|a| Album.new(a).print_m3u }
+songs.each  {|s| Song.new(a).print_mp3  }
