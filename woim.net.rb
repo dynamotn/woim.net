@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-# $Id$ 
+# $Id$
 # author   : kyanh <@viettug.org>
 # purpose  : fetch list of mp3 files from http://woim.net/
 # license  : GPL version 2
@@ -10,6 +10,7 @@
 
 require 'rubygems'    # for the others
 require 'curb'        # for fetching data
+require 'base64'
 
 class Message
   def initialize(msg)
@@ -17,18 +18,24 @@ class Message
   end
 end
 
+# Provide very simple cache system. By default, cach directory is located
+# in current working directory
 module Cache
+  # Convert to cache file from cache_id
   def filename(cache_id)
     "./cache/#{cache_id}"
   end
 
+  # Write contents (a string) to cache file
   def write(cache_id, contents)
     f = open(filename(cache_id), "w")
     f.write(contents)
     f.close
     Message.new "cache updated: #{cache_id}"
   end
-  
+
+  # Read contents from cache whose id is cache_id.
+  # If any error ocurrs, return nil as result.
   def read(cache_id)
     if cached?(cache_id)
       begin
@@ -41,7 +48,8 @@ module Cache
       return nil
     end
   end
-  
+
+  # Return true of cache 'cache_id' does exist
   def cached?(cache_id)
     File.exist?(filename(cache_id))
   end
@@ -63,11 +71,11 @@ class Fetch
       @@proxy = nil
     end
   end
-  
+
   def self.agent=(a)
     @@agent = a if a.is_a?(String) and !a.empty?
   end
-  
+
   def self.debug=(value)
     @@debug = value
   end
@@ -106,27 +114,33 @@ end
 
 class Song
   attr_reader :w_url, :w_id
-  
+
   def initialize(song_id)
     @w_id = song_id.to_s
     @w_url = "http://www.woim.net/song/#{@w_id}/index.html"
   end
 
+  # Provide URL for mp3 file. The URL is fetched from web page.
+  # Before being fetched, data are read from cache. If the cache doesn't
+  # exist, or the cache is too old (the timestamp < time.now) the contents
+  # will be fetched again from remote.
   def mp3
     link_to_mp3 = ""
+    fetch_retry = true
     fetch = Fetch.new(@w_url, "song_#{@w_id}")
     body = fetch.body
     if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
-      text = fetch.cached ? body : Fetch.new(meta_url).body
+      text = fetch.cached && (body.encoded_to_timestamp > Time.now) ? body : Fetch.new(meta_url).body
       gs = text.match(%r|location="(.*?)">|i)
       link_to_mp3 = gs[1] if gs
     elsif gs = body.match(%r|<param name="FileName" value="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
-      text = fetch.cached ? body : Fetch.new(meta_url).body
+      text = fetch.cached && (body.encoded_to_timestamp > Time.now) ? body : Fetch.new(meta_url).body
       gs = text.match(%r|<ref href="(.*?)" />|i)
       link_to_mp3 = gs[1] if gs
     end
+
     if !link_to_mp3.empty? and !fetch.cached
       ct = []
       ct << "<param name=\"flashvars\" code=#{meta_url}\">"
@@ -136,14 +150,43 @@ class Song
     return link_to_mp3
   end
 
-  def print_mp3
-    puts mp3
+  # Print real link to mp3 file.
+  def print_mp3(opts = {})
+    as_wget = opts[:wget] || false
+    url = mp3
+    puts url.as_wget(:wget => opts[:wget], :output => url.encoded_to_basename)
   end
 end
 
 class String
   def sanitized
     self.downcase.gsub(/[^0-9a-z_-]/,' ').gsub(' ','_')
+  end
+  # Decode a base64 string
+  def base64_decode
+    Base64.decode64(self)
+  end
+  def as_wget(args = {})
+    return "" if self.empty?
+    as_wget = args[:wget]
+    output = args[:output]
+    as_wget ? "wget \"#{self}\" -O \"#{output}\"" : self
+  end
+  # convert URL (encoded) to basename of mp3 file
+  def encoded_to_basename
+    if gs = self.match(/auth=([0-9a-z]+)/i)
+      File.basename(gs[1].base64_decode.base64_decode.split(",").first)
+    else
+      File.basename(self)
+    end
+  end
+
+  def encoded_to_timestamp
+    if gs = self.match(/auth=([0-9a-z]+)/i)
+      t = Time.at(gs[1].base64_decode.base64_decode.split(",")[1].to_i)
+    else
+      0
+    end
   end
 end
 
@@ -159,7 +202,7 @@ class Album
     @w_title = nil
     @w_artist = nil
     @w_list = []
-    
+
     get_info
     get_list
     write_cache unless fetch.cached
@@ -182,8 +225,8 @@ class Album
       end
     end
   end
-  
-  def print_m3u
+
+  def print_m3u(opts = {})
     unless @w_list.empty?
       Message.new "-" * 46
       @w_list.each do |s|
@@ -192,7 +235,9 @@ class Album
       Message.new "-" * 46
       Message.new "list of mp3 files"
       Message.new "-" * 46
-      @w_list.each { |s|  puts s[:mp3] }
+      @w_list.each do |s|
+        puts s[:mp3].as_wget(:wget => opts[:wget], :output => s[:mp3].encoded_to_basename)
+      end
     end
   end
 
@@ -211,6 +256,7 @@ private
     self
   end
 
+  # Get album information.
   def get_info
     if gs = @w_text.match(%r#
                 class="album_info">.*?
@@ -223,7 +269,8 @@ private
     end
     self
   end
-  
+
+  # Get list of files
   def get_list
     w_list = []
     @w_text.scan(%r|
@@ -248,7 +295,9 @@ Fetch.proxy = nil # {:host => "localhost",:port => 3128}
 albums = []
 songs  = []
 
-ARGV.each do |arg|
+args = ARGV.clone
+as_mp3 = args.delete("--wget")
+args.each do |arg|
   if gs = arg.match(%r|album/([0-9]+)|) or gs = arg.match(%r|^([0-9]+)$|)
     albums << gs[1]
   elsif gs = arg.match(%r|song/([0-9]+)|)
@@ -260,5 +309,5 @@ ARGV.each do |arg|
   end
 end
 
-albums.each {|a| Album.new(a).print_m3u }
-songs.each  {|s| Song.new(s).print_mp3  }
+albums.each {|a| Album.new(a).print_m3u(:wget => as_mp3) }
+songs.each  {|s|  Song.new(s).print_mp3(:wget => as_mp3) }
