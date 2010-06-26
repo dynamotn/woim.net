@@ -170,7 +170,7 @@ class String
     return "" if self.empty?
     as_wget = args[:wget]
     output = args[:output]
-    as_wget ? "wget -O \"#{output}\" \"#{self}\"" : self
+    as_wget ? "wget -c -O \"#{output}\" \"#{self}\"" : self
   end
   # convert URL (encoded) to basename of mp3 file
   def encoded_to_basename
