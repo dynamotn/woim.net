@@ -129,19 +129,20 @@ class Song
     fetch_retry = true
     fetch = Fetch.new(@w_url, "song_#{@w_id}")
     body = fetch.body
+    too_old = (body.encoded_to_timestamp < Time.now)
     if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
-      text = fetch.cached && (body.encoded_to_timestamp > Time.now) ? body : Fetch.new(meta_url).body
+      text = fetch.cached && !too_old ? body : Fetch.new(meta_url).body
       gs = text.match(%r|location="(.*?)">|i)
       link_to_mp3 = gs[1] if gs
     elsif gs = body.match(%r|<param name="FileName" value="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
-      text = fetch.cached && (body.encoded_to_timestamp > Time.now) ? body : Fetch.new(meta_url).body
+      text = fetch.cached && !too_old ? body : Fetch.new(meta_url).body
       gs = text.match(%r|<ref href="(.*?)" />|i)
       link_to_mp3 = gs[1] if gs
     end
 
-    if !link_to_mp3.empty? and !fetch.cached
+    if !link_to_mp3.empty? and (!fetch.cached or too_old)
       ct = []
       ct << "<param name=\"flashvars\" code=#{meta_url}\">"
       ct << "location=\"#{link_to_mp3}\">"
@@ -185,7 +186,7 @@ class String
     if gs = self.match(/auth=([0-9a-z]+)/i)
       t = Time.at(gs[1].base64_decode.base64_decode.split(",")[1].to_i)
     else
-      0
+      Time.at(0)
     end
   end
 end
