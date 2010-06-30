@@ -75,6 +75,10 @@ class Fetch
   def self.agent=(a)
     @@agent = a if a.is_a?(String) and !a.empty?
   end
+  
+  def self.agent
+    @@agent
+  end
 
   def self.debug=(value)
     @@debug = value
@@ -130,6 +134,7 @@ class Song
     fetch = Fetch.new(@w_url, "song_#{@w_id}")
     body = fetch.body
     too_old = (body.encoded_to_timestamp < Time.now)
+    Message::new("cache out-of-date. Going to fetch new version.") if too_old
     if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
       meta_url = gs[1]
       text = fetch.cached && !too_old ? body : Fetch.new(meta_url).body
@@ -171,7 +176,7 @@ class String
     return "" if self.empty?
     as_wget = args[:wget]
     output = args[:output]
-    as_wget ? "wget -c -O \"#{output}\" \"#{self}\"" : self
+    as_wget ? "wget -c -O \"#{output}\" -U \"#{Fetch.agent}\" \"#{self}\"" : self
   end
   # convert URL (encoded) to basename of mp3 file
   def encoded_to_basename
@@ -222,7 +227,10 @@ class Album
       Message.new "wget script to download mp3 file(s)"
       Message.new "-" * 46
       @w_list.each do |s|
-        puts "wget -O \"#{@w_title.sanitized}_#{s[:title].sanitized}.mp3\" \"#{s[:mp3]}\""
+        st = "wget -O \"#{@w_title.sanitized}_#{s[:title].sanitized}.mp3\""
+        st << " -U \"#{Fetch.agent}\""
+        st << " \"#{s[:mp3]}\""
+        puts st
       end
     end
   end
@@ -299,9 +307,9 @@ songs  = []
 args = ARGV.clone
 as_mp3 = args.delete("--wget")
 args.each do |arg|
-  if gs = arg.match(%r|album/([0-9]+)|) or gs = arg.match(%r|^([0-9]+)$|)
+  if gs = arg.match(%r|album[/_]([0-9]+)|) or gs = arg.match(%r|^([0-9]+)$|)
     albums << gs[1]
-  elsif gs = arg.match(%r|song/([0-9]+)|)
+  elsif gs = arg.match(%r|song[/_]([0-9]+)|)
     songs << gs[1]
   elsif gs = arg.match(%r|proxy=(.*?):([0-9]+)|)
     Fetch.proxy = {:host => gs[1], :port => gs[2]}
