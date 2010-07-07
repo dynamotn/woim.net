@@ -60,7 +60,10 @@ include Cache
 class Fetch
   attr_reader :url, :cache, :cached
 
-  @@agent = "Mozilla/5.0 (X11; U; Linux i686; en-US; Nautilus/1.0Final) Gecko/20020408"
+  # default browser agent
+  @@agent   = "Mozilla/5.0 (Macintosh; U; PPC Mac OS X; en-us) AppleWebKit/xxx.x (KHTML like Gecko) Safari/12x.x"
+  # default agent for music player
+  @@agent_m = "Windows-Media-Player/10.00.00.3646"
   @@debug = false
 
   def self.proxy=(a)
@@ -75,9 +78,13 @@ class Fetch
   def self.agent=(a)
     @@agent = a if a.is_a?(String) and !a.empty?
   end
-  
+
   def self.agent
     @@agent
+  end
+
+  def self.agent_m
+    @@agent_m
   end
 
   def self.debug=(value)
@@ -102,7 +109,7 @@ class Fetch
     begin
       Message.new "fetching #{@url}"
       c = Curl::Easy.perform(@url) do |curl|
-        curl.headers["User-Agent"] = @@agent
+        curl.headers["User-Agent"] = (@url.include?("/music/") ? @@agent_m : @@agent)
         curl.verbose = @@debug
         if @@proxy
           curl.proxy_url  = @@proxy[:host]
@@ -117,11 +124,12 @@ class Fetch
 end
 
 class Song
-  attr_reader :w_url, :w_id
+  attr_reader :w_url, :w_id, :w_title
 
   def initialize(song_id)
     @w_id = song_id.to_s
     @w_url = "http://www.woim.net/song/#{@w_id}/index.html"
+    @w_title = nil
   end
 
   # Provide URL for mp3 file. The URL is fetched from web page.
@@ -130,27 +138,39 @@ class Song
   # will be fetched again from remote.
   def mp3
     link_to_mp3 = ""
-    fetch_retry = true
     fetch = Fetch.new(@w_url, "song_#{@w_id}")
     body = fetch.body
     too_old = (body.encoded_to_timestamp < Time.now)
     Message::new("cache out-of-date. Going to fetch new version.") if too_old
-    if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
+    if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/music/[^"]+)">|i)
       meta_url = gs[1]
+
+      # title detection
+      gs = body.match(%r|/song/#{@w_id}/.*>[0-9 ]*(.*?)</a>|i)
+      @w_title = gs[1] if gs
+
+      # location detection
       text = fetch.cached && !too_old ? body : Fetch.new(meta_url).body
       gs = text.match(%r|location="(.*?)">|i)
       link_to_mp3 = gs[1] if gs
-    elsif gs = body.match(%r|<param name="FileName" value="(http://www\.woim\.net/.*?/#{@w_id}/.*?)">|i)
+    elsif gs = body.match(%r|<param name="FileName" value="(http://www\.woim\.net/music/[^"]+)">|i)
       meta_url = gs[1]
+
+      # title detection
+      gs = body.match(%r|/song/#{@w_id}/.*>[0-9 ]*(.*?)</a>|i)
+      @w_title = gs[1] if gs
+
+      # location detection
       text = fetch.cached && !too_old ? body : Fetch.new(meta_url).body
       gs = text.match(%r|<ref href="(.*?)" />|i)
       link_to_mp3 = gs[1] if gs
     end
-
     if !link_to_mp3.empty? and (!fetch.cached or too_old)
       ct = []
       ct << "<param name=\"flashvars\" code=#{meta_url}\">"
       ct << "location=\"#{link_to_mp3}\">"
+      @w_title = "#{@w_id}" if !@w_title
+      ct << "/song/#{@w_id}/>#{@w_title}</a>"
       Cache::write("song_#{@w_id}", ct.join("\n"))
     end
     return link_to_mp3
@@ -160,7 +180,11 @@ class Song
   def print_mp3(opts = {})
     as_wget = opts[:wget] || false
     url = mp3
-    puts url.as_wget(:wget => opts[:wget], :output => url.encoded_to_basename)
+    puts url.as_wget(:wget => opts[:wget], :output => to_filename)
+  end
+
+  def to_filename
+    "#{@w_id}-#{@w_title.gsub(' ', '-').downcase}.mp3"
   end
 end
 
@@ -176,7 +200,7 @@ class String
     return "" if self.empty?
     as_wget = args[:wget]
     output = args[:output]
-    as_wget ? "wget -c -O \"#{output}\" -U \"#{Fetch.agent}\" \"#{self}\"" : self
+    as_wget ? "wget -c -O \"#{output}\" -U \"#{Fetch.agent_m}\" \"#{self}\"" : self
   end
   # convert URL (encoded) to basename of mp3 file
   def encoded_to_basename
@@ -245,7 +269,7 @@ class Album
       Message.new "list of mp3 files"
       Message.new "-" * 46
       @w_list.each do |s|
-        puts s[:mp3].as_wget(:wget => opts[:wget], :output => s[:mp3].encoded_to_basename)
+        puts s[:mp3].as_wget(:wget => opts[:wget], :output => "#{s[:id]}-#{s[:title].gsub(' ', '-').downcase}.mp3")
       end
     end
   end
@@ -282,9 +306,10 @@ private
   # Get list of files
   def get_list
     w_list = []
+    #  <a href="http://www.woim.net/song/39144/awakening.html" title="Awakening">Awakening</a>
     @w_text.scan(%r|
               <td>[0-9]+.*?
-                href="http://www\.woim\.net/song/([0-9]+)/.*?>(.*?)</a>
+                href="http://www\.woim\.net/song/([0-9]+)/.*?>[0-9 ]*(.*?)</a>
                   |mx) \
     do |id,title|
       w_list << {:id => id, :title => title}
