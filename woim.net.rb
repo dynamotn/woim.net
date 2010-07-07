@@ -61,7 +61,7 @@ class Fetch
   attr_reader :url, :cache, :cached
 
   # default browser agent
-  @@agent   = "Mozilla/5.0 (Macintosh; U; PPC Mac OS X; en-us) AppleWebKit/xxx.x (KHTML like Gecko) Safari/12x.x"
+  @@agent   = "Mozilla/5.0 (compatible; MSIE 7.0; Windows NT 6.0; SLCC1; .NET CLR 2.0.50727; Media Center PC 5.0; c .NET CLR 3.0.04506; .NET CLR 3.5.30707; InfoPath.1; el-GR)"
   # default agent for music player
   @@agent_m = "Windows-Media-Player/10.00.00.3646"
   @@debug = false
