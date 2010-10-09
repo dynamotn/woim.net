@@ -215,7 +215,7 @@ class String
     if gs = self.match(/auth=([0-9a-z]+)/i)
       t = Time.at(gs[1].base64_decode.base64_decode.split(",")[1].to_i)
     else
-      Time.at(0)
+      Time.now + 3600
     end
   end
 end
