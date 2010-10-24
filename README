@@ -1,0 +1,31 @@
+A jifty tool to get MP3 links from the site: http://woim.net/.
+
+Story:
+
+  woim.net/ is a site that provides free/commercial service for
+  music (instrucmental music.) Free account can download a limit
+  number of files each mintute. And this tool will help you to
+  bypass Woim.net/ policy: You are free to download any files,
+  anytime. No limitation.
+
+  This tool may violate Woim.net/'s policy. So use as your risk.
+  More details about this problem can be found in the last section
+  of tool's wiki page
+          http://dragula.org/projects/fs/wiki/Woim
+  (There is only Vietnamese version.)
+
+Usage:
+
+  The tool is written in Ruby and it needs the gem 'curb'.
+
+  Before you use the script, create a directory named 'cached' in
+  current working directory. The get the URL of your albums/songs:
+
+    ./woim.net.rb [albumd_id] [url_to_album] [album_to_song] ...
+
+  Example:
+    ./woim.net.rb album/3029 | grep ^http://
+    ./woim.net.rb song/36744
+
+Homepage:
+  * (Vietnamese): http://dragula.org/projects/fs/wiki/Woim
