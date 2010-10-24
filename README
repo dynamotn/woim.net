@@ -5,7 +5,7 @@ Story:
   woim.net/ is a site that provides free/commercial service for
   music (instrumental music.) Free account can download a limit
   number of files each mintute. And this tool will help you to
-  bypass Woim.net/ policy: You are free to download any files,
+  bypass woim.net/ policy: You are free to download any files,
   anytime. No limitation.
 
   This tool may violate Woim.net/'s policy. So use as your risk.
@@ -21,7 +21,7 @@ Usage:
   Before you use the script, create a directory named 'cached' in
   current working directory. The get the URL of your albums/songs:
 
-    ./woim.net.rb [albumd_id] [url_to_album] [album_to_song] ...
+    ./woim.net.rb [albumd_id] [url_to_album] [url_to_song] ...
 
   Example:
     ./woim.net.rb album/3029 | grep ^http://
