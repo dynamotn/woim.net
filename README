@@ -18,9 +18,10 @@ Usage:
 
   The tool is written in Ruby and it needs the gem 'curb'.
 
-  Before you use the script, create a directory named 'cached' in
+  Before you use the script, create a directory named 'cache' in
   current working directory. The get the URL of your albums/songs:
 
+    mkdir -pv ./cache/
     ./woim.net.rb [albumd_id] [url_to_album] [url_to_song] ...
 
   Example:
