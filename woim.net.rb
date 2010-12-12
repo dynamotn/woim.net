@@ -178,9 +178,9 @@ class Song
 
   # Print real link to mp3 file.
   def print_mp3(opts = {})
-    as_wget = opts[:wget] || false
     url = mp3
     puts url.as_wget(:wget => opts[:wget], :output => to_filename)
+    puts url.as_aria(:aria => opts[:aria], :output => to_filename)
   end
 
   def to_filename
@@ -196,11 +196,17 @@ class String
   def base64_decode
     Base64.decode64(self)
   end
+  # Print wget script to download the file
   def as_wget(args = {})
     return "" if self.empty?
-    as_wget = args[:wget]
-    output = args[:output]
+    as_wget, output = args[:wget], args[:output]
     as_wget ? "wget -c -O \"#{output}\" -U \"#{Fetch.agent_m}\" \"#{self}\"" : self
+  end
+  # Print aria2c script to download the file
+  def as_aria(args = {})
+    return "" if self.empty?
+    as_aria, output = args[:aria], args[:output]
+    as_aria ? "aria2c --header 'User-Agent: #{Fetch.agent_m}' \"#{self}\"" : self
   end
   # convert URL (encoded) to basename of mp3 file
   def encoded_to_basename
@@ -270,6 +276,7 @@ class Album
       Message.new "-" * 46
       @w_list.each do |s|
         puts s[:mp3].as_wget(:wget => opts[:wget], :output => "#{s[:id]}-#{s[:title].gsub(' ', '-').downcase}.mp3")
+        puts s[:mp3].as_aria(:aria => opts[:aria], :output => "#{s[:id]}-#{s[:title].gsub(' ', '-').downcase}.mp3")
       end
     end
   end
@@ -323,25 +330,31 @@ private
   end
 end
 
-Fetch.debug = false
-Fetch.proxy = nil # {:host => "localhost",:port => 3128}
+def __main__
 
-albums = []
-songs  = []
+  Fetch.debug = false
+  Fetch.proxy = nil # {:host => "localhost",:port => 3128}
 
-args = ARGV.clone
-as_mp3 = args.delete("--wget")
-args.each do |arg|
-  if gs = arg.match(%r|album[/_]([0-9]+)|) or gs = arg.match(%r|^([0-9]+)$|)
-    albums << gs[1]
-  elsif gs = arg.match(%r|song[/_]([0-9]+)|)
-    songs << gs[1]
-  elsif gs = arg.match(%r|proxy=(.*?):([0-9]+)|)
-    Fetch.proxy = {:host => gs[1], :port => gs[2]}
-  else
-    Message.new "failed to parse: #{url}"
+  albums = []
+  songs  = []
+
+  args = ARGV.clone
+  as_mp3  = args.delete("--wget")
+  as_aria = args.delete("--aria")
+  args.each do |arg|
+    if gs = arg.match(%r|album[/_]([0-9]+)|) or gs = arg.match(%r|^([0-9]+)$|)
+      albums << gs[1]
+    elsif gs = arg.match(%r|song[/_]([0-9]+)|)
+      songs << gs[1]
+    elsif gs = arg.match(%r|proxy=(.*?):([0-9]+)|)
+      Fetch.proxy = {:host => gs[1], :port => gs[2]}
+    else
+      Message.new "failed to parse: #{arg}"
+    end
   end
+
+  albums.each {|a| Album.new(a).print_m3u(:wget => as_mp3, :aria => as_aria) }
+  songs.each  {|s|  Song.new(s).print_mp3(:wget => as_mp3, :aria => as_aria) }
 end
 
-albums.each {|a| Album.new(a).print_m3u(:wget => as_mp3) }
-songs.each  {|s|  Song.new(s).print_mp3(:wget => as_mp3) }
+__main__ if $0 == __FILE__
