@@ -184,13 +184,13 @@ class Song
   end
 
   def to_filename
-    "#{@w_id}-#{@w_title.gsub(' ', '-').downcase}.mp3"
+    "#{@w_id}-#{@w_title.sanitized}.mp3"
   end
 end
 
 class String
   def sanitized
-    self.downcase.gsub(/[^0-9a-z_-]/,' ').gsub(' ','_')
+    self.downcase.gsub(/[^0-9a-z_\-\.]/i,'_')
   end
   # Decode a base64 string
   def base64_decode
@@ -200,7 +200,7 @@ class String
   def as_wget(args = {})
     return "" if self.empty?
     as_wget, output = args[:wget], args[:output]
-    as_wget ? "wget -c -O \"#{output}\" -U \"#{Fetch.agent_m}\" \"#{self}\"" : self
+    as_wget ? "wget -c -O \"#{output.sanitized}\" -U \"#{Fetch.agent_m}\" \"#{self}\"" : self
   end
   # Print aria2c script to download the file
   def as_aria(args = {})
@@ -275,8 +275,8 @@ class Album
       Message.new "list of mp3 files"
       Message.new "-" * 46
       @w_list.each do |s|
-        puts s[:mp3].as_wget(:wget => opts[:wget], :output => "#{s[:id]}-#{s[:title].gsub(' ', '-').downcase}.mp3")
-        puts s[:mp3].as_aria(:aria => opts[:aria], :output => "#{s[:id]}-#{s[:title].gsub(' ', '-').downcase}.mp3")
+        puts s[:mp3].as_wget(:wget => opts[:wget], :output => "#{s[:id]}-#{s[:title]}.mp3")
+        puts s[:mp3].as_aria(:aria => opts[:aria], :output => "#{s[:id]}-#{s[:title]}.mp3")
       end
     end
   end
