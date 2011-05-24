@@ -63,7 +63,7 @@ class Fetch
   # default browser agent
   @@agent   = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; Media Center PC 3.0; .NET CLR 1.0.3705; MediaCenter 5.1.2600.2180)"
   # default agent for music player
-  @@agent_m = "Windows-Media-Player/10.00.00.3646"
+  @@agent_m = @@agent
   @@debug = false
 
   def self.proxy=(a)
