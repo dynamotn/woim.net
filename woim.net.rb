@@ -41,7 +41,7 @@ module Cache
       begin
         Message.new "cache loaded: #{cache_id}"
         IO.readlines(filename(cache_id)).join()
-      rescue
+      rescue => e
         return nil
       end
     else
@@ -117,7 +117,7 @@ class Fetch
         end
       end
       return c.body_str
-    rescue
+    rescue => e
       return ""
     end
   end
@@ -142,35 +142,24 @@ class Song
     body = fetch.body
     too_old = (body.encoded_to_timestamp < Time.now)
     Message::new("cache out-of-date. Going to fetch new version.") if too_old
-    if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/music/[^"]+)">|i)
+    if gs = body.match(%r|<param name="flashvars".*?code=(http://www\.woim\.net/list/[^"]+)">|i)
       meta_url = gs[1]
 
       # title detection
-      gs = body.match(%r|/song/#{@w_id}/.*>[0-9 ]*(.*?)</a>|i)
+      gs = body.match(%r|<track.*?location="[^"].+">(.*?)</track>|i)
       @w_title = gs[1] if gs
 
       # location detection
-      text = fetch.cached && !too_old ? body : Fetch.new(meta_url).body
+      text = (fetch.cached && !too_old) ? body : Fetch.new(meta_url).body
       gs = text.match(%r|location="(.*?)">|i)
       link_to_mp3 = gs[1] if gs
-    elsif gs = body.match(%r|<param name="FileName" value="(http://www\.woim\.net/music/[^"]+)">|i)
-      meta_url = gs[1]
-
-      # title detection
-      gs = body.match(%r|/song/#{@w_id}/.*>[0-9 ]*(.*?)</a>|i)
-      @w_title = gs[1] if gs
-
-      # location detection
-      text = fetch.cached && !too_old ? body : Fetch.new(meta_url).body
-      gs = text.match(%r|<ref href="(.*?)" />|i)
-      link_to_mp3 = gs[1] if gs
     end
+
     if !link_to_mp3.empty? and (!fetch.cached or too_old)
+      @w_title = "#{@w_id}" if !@w_title
       ct = []
       ct << "<param name=\"flashvars\" code=#{meta_url}\">"
-      ct << "location=\"#{link_to_mp3}\">"
-      @w_title = "#{@w_id}" if !@w_title
-      ct << "/song/#{@w_id}/>#{@w_title}</a>"
+      ct << "<track location=\"#{link_to_mp3}\">#{@w_title}</track>"
       Cache::write("song_#{@w_id}", ct.join("\n"))
     end
     return link_to_mp3
@@ -285,12 +274,11 @@ private
 
   def write_cache
     st = []
-    st << 'class="album_info">'
-    st << "Album: <h1>#{@w_title}</h1>"
-    st << "<tr></tr>"
-    st << "<tr>Artist: href=>#{@w_artist}</a></tr>"
+    st << 'navigationCTop'
+    st << "<h1>#{@w_title}</h1>"
+    st << "Artist: href=>#{@w_artist}</a>"
     @w_list.each do |song|
-      st << "<td>0. href=\"http://www.woim.net/song/#{song[:id]}/\">#{song[:title]}</a>"
+      st << "class=\"link_song href=\"http://www.woim.net/song/#{song[:id]}/\">#{song[:title]}</a>"
     end
     Cache.write("album_#{@w_id}", st.join("\n"))
     self
@@ -299,13 +287,12 @@ private
   # Get album information.
   def get_info
     if gs = @w_text.match(%r#
-                class="album_info">.*?
-                  Album:  .*? <h1>(.*?)</h1>.*?
-                  <tr>.*?</tr>.*?
-                  <tr>.*? href=.*?>(.*?)</a>.*?</tr>
+                navigationCTop.*?
+                <h1>(.*?)</h1>.*?
+                Artist:.*?href=.*?>(.*?)</a>.*?
                           #mx)
       @w_title , @w_artist = gs[1,2]
-      Message.new "album found #{@w_title} (performed by #{@w_artist})"
+      Message.new "album = #{@w_title} (artist = #{@w_artist})"
     end
     self
   end
@@ -315,8 +302,8 @@ private
     w_list = []
     #  <a href="http://www.woim.net/song/39144/awakening.html" title="Awakening">Awakening</a>
     @w_text.scan(%r|
-              <td>[0-9]+.*?
-                href="http://www\.woim\.net/song/([0-9]+)/.*?>[0-9 ]*(.*?)</a>
+              class="link_song.*?
+              href="http://www\.woim\.net/song/([0-9]+)/.*?>(.*?)</a>
                   |mx) \
     do |id,title|
       w_list << {:id => id, :title => title}
@@ -333,7 +320,7 @@ end
 def __main__
 
   Fetch.debug = false
-  Fetch.proxy = nil # {:host => "localhost",:port => 3128}
+  Fetch.proxy = nil
 
   albums = []
   songs  = []
@@ -347,7 +334,7 @@ def __main__
     elsif gs = arg.match(%r|song[/_]([0-9]+)|)
       songs << gs[1]
     elsif gs = arg.match(%r|proxy=(.*?):([0-9]+)|)
-      Fetch.proxy = {:host => gs[1], :port => gs[2]}
+      Fetch.proxy = {:host => gs[1], :port => gs[2].to_i}
     else
       Message.new "failed to parse: #{arg}"
     end
