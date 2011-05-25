@@ -172,7 +172,7 @@ class Song
   end
 
   def to_filename
-    "#{@w_id}-#{@w_title.sanitized}.mp3"
+    "#{@w_id}-#{@w_title.to_s.sanitized}.mp3"
   end
 end
 
