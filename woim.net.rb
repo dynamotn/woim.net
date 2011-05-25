@@ -169,7 +169,6 @@ class Song
   def print_mp3(opts = {})
     url = mp3
     puts url.as_wget(:wget => opts[:wget], :output => to_filename)
-    puts url.as_aria(:aria => opts[:aria], :output => to_filename)
   end
 
   def to_filename
@@ -190,12 +189,6 @@ class String
     return "" if self.empty?
     as_wget, output = args[:wget], args[:output]
     as_wget ? "wget -c -O \"#{output.sanitized}\" -U \"#{Fetch.agent_m}\" \"#{self}\"" : self
-  end
-  # Print aria2c script to download the file
-  def as_aria(args = {})
-    return "" if self.empty?
-    as_aria, output = args[:aria], args[:output]
-    as_aria ? "aria2c --header 'User-Agent: #{Fetch.agent_m}' \"#{self}\"" : self
   end
   # convert URL (encoded) to basename of mp3 file
   def encoded_to_basename
@@ -265,7 +258,6 @@ class Album
       Message.new "-" * 46
       @w_list.each do |s|
         puts s[:mp3].as_wget(:wget => opts[:wget], :output => "#{s[:id]}-#{s[:title]}.mp3")
-        puts s[:mp3].as_aria(:aria => opts[:aria], :output => "#{s[:id]}-#{s[:title]}.mp3")
       end
     end
   end
@@ -327,7 +319,6 @@ def __main__
 
   args = ARGV.clone
   as_mp3  = args.delete("--wget")
-  as_aria = args.delete("--aria")
   args.each do |arg|
     if gs = arg.match(%r|album[/_]([0-9]+)|) or gs = arg.match(%r|^([0-9]+)$|)
       albums << gs[1]
@@ -340,8 +331,8 @@ def __main__
     end
   end
 
-  albums.each {|a| Album.new(a).print_m3u(:wget => as_mp3, :aria => as_aria) }
-  songs.each  {|s|  Song.new(s).print_mp3(:wget => as_mp3, :aria => as_aria) }
+  albums.each {|a| Album.new(a).print_m3u(:wget => as_mp3) }
+  songs.each  {|s|  Song.new(s).print_mp3(:wget => as_mp3) }
 end
 
 __main__ if $0 == __FILE__
