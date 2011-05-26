@@ -178,7 +178,7 @@ end
 
 class String
   def sanitized
-    self.downcase.gsub(/[^0-9a-z_\-\.]/i,'_')
+    self.downcase.gsub(/[^0-9a-z_\-\.]/i,'_').gsub('-www.woim.net', '')
   end
   # Decode a base64 string
   def base64_decode
